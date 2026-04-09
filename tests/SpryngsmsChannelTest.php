@@ -1,104 +1,113 @@
 <?php
 
-namespace Oscar\Spryngsms\Tests;
-
-use Illuminate\Http\Client\RequestException;
-use Mockery;
+use Illuminate\Notifications\Notification;
 use Mockery\MockInterface;
-use Orchestra\Testbench\TestCase;
-use Oscar\Spryngsms\Exceptions\CouldNotSendSmsNotification;
 use Oscar\Spryngsms\SpryngsmsChannel;
 use Oscar\Spryngsms\SpryngsmsClient;
 use Oscar\Spryngsms\SpryngsmsMessage;
-use Illuminate\Notifications\Notification;
 
-class SpryngsmsChannelTest extends TestCase
+function mockNotification(mixed $notifiable, string|SpryngsmsMessage $message): void
 {
-    /**
-     * @throws RequestException
-     * @throws CouldNotSendSmsNotification
-     */
-    public function test_it_can_send_sms_with_message_object()
-    {
-        $message = new SpryngsmsMessage('message', [1234567]);
-        $notifiable = new \stdClass();
-
-        $this->createNotificationMock($notifiable, $message);
-        $this->createSpryngClientMock($message);
-
-        $channel = new SpryngsmsChannel(app(SpryngsmsClient::class));
-        $channel->send($notifiable, app(Notification::class));
-    }
-
-    /**
-     * @throws RequestException
-     * @throws CouldNotSendSmsNotification
-     */
-    public function test_it_can_send_sms_if_message_string()
-    {
-        $message = 'message';
-
-        $notifiable = new class{
-            public int $phoneNumber = 12345678;
-            public function routeNotificationForSpryngsms(): int
-            {
-                return $this->phoneNumber;
-            }
-        };;
-
-        $this->createNotificationMock($notifiable, $message);
-        $this->createSpryngClientMock(
-            Mockery::on(fn ($arg) => $arg == new SpryngsmsMessage($message, [$notifiable->phoneNumber]))
-        );
-
-        $channel = new SpryngsmsChannel(app(SpryngsmsClient::class));
-        $channel->send($notifiable, app(Notification::class));
-    }
-
-    public function test_it_can_send_sms_if_message_string_with_phone_number_array()
-    {
-        $message = 'message';
-
-        $notifiable = new class{
-            public array $phoneNumbers = [12345678];
-            public function routeNotificationForSpryngsms(): array
-            {
-                return $this->phoneNumbers;
-            }
-        };;
-
-        $this->createNotificationMock($notifiable, $message);
-        $this->createSpryngClientMock(
-            Mockery::on(fn ($arg) => $arg == new SpryngsmsMessage($message, $notifiable->phoneNumbers))
-        );
-
-        $channel = new SpryngsmsChannel(app(SpryngsmsClient::class));
-        $channel->send($notifiable, app(Notification::class));
-    }
-
-    private function createNotificationMock(mixed $notifiable, string|SpryngsmsMessage $message)
-    {
-        $this->instance(
-            Notification::class,
-            Mockery::mock(Notification::class,
-                fn(MockInterface $mock) => $mock->shouldReceive('toSpryngsms')
-                    ->once()
-                    ->with($notifiable)
-                    ->andReturn($message)
-            )
-        );
-    }
-
-    private function createSpryngClientMock(mixed $params)
-    {
-        $this->instance(
-            SpryngsmsClient::class,
-            Mockery::mock(
-                SpryngsmsClient::class,
-                fn(MockInterface $mock) => $mock->shouldReceive('send')
-                    ->once()
-                    ->with($params)
-            )
-        );
-    }
+    test()->instance(
+        Notification::class,
+        Mockery::mock(Notification::class,
+            fn (MockInterface $mock) => $mock->shouldReceive('toSpryngsms')
+                ->once()
+                ->with($notifiable)
+                ->andReturn($message)
+        )
+    );
 }
+
+function mockClient(mixed $expectation): void
+{
+    test()->instance(
+        SpryngsmsClient::class,
+        Mockery::mock(
+            SpryngsmsClient::class,
+            fn (MockInterface $mock) => $mock->shouldReceive('send')
+                ->once()
+                ->with($expectation)
+        )
+    );
+}
+
+function sendNotification(mixed $notifiable): void
+{
+    $channel = new SpryngsmsChannel(app(SpryngsmsClient::class));
+    $channel->send($notifiable, app(Notification::class));
+}
+
+it('sends sms with a message object', function () {
+    $message = new SpryngsmsMessage('message', [1234567]);
+    $notifiable = new stdClass;
+
+    mockNotification($notifiable, $message);
+    mockClient($message);
+    sendNotification($notifiable);
+});
+
+it('converts a string message using the notifiable phone number', function () {
+    $notifiable = new class
+    {
+        public int $phoneNumber = 12345678;
+
+        public function routeNotificationForSpryngsms(): int
+        {
+            return $this->phoneNumber;
+        }
+    };
+
+    mockNotification($notifiable, 'message');
+    mockClient(Mockery::on(fn ($arg) => $arg == new SpryngsmsMessage('message', [$notifiable->phoneNumber])));
+    sendNotification($notifiable);
+});
+
+it('converts a string message using a phone number array', function () {
+    $notifiable = new class
+    {
+        public array $phoneNumbers = [12345678, 87654321];
+
+        public function routeNotificationForSpryngsms(): array
+        {
+            return $this->phoneNumbers;
+        }
+    };
+
+    mockNotification($notifiable, 'message');
+    mockClient(Mockery::on(fn ($arg) => $arg == new SpryngsmsMessage('message', $notifiable->phoneNumbers)));
+    sendNotification($notifiable);
+});
+
+it('does not send when recipients are empty', function () {
+    $message = new SpryngsmsMessage('message', []);
+    $notifiable = new stdClass;
+
+    mockNotification($notifiable, $message);
+
+    test()->instance(
+        SpryngsmsClient::class,
+        Mockery::mock(
+            SpryngsmsClient::class,
+            fn (MockInterface $mock) => $mock->shouldNotReceive('send')
+        )
+    );
+
+    sendNotification($notifiable);
+});
+
+it('does not send when notifiable has no route and message has no recipients', function () {
+    $notifiable = new stdClass;
+
+    mockNotification($notifiable, 'message');
+
+    test()->instance(
+        SpryngsmsClient::class,
+        Mockery::mock(
+            SpryngsmsClient::class,
+            fn (MockInterface $mock) => $mock->shouldNotReceive('send')
+        )
+    );
+
+    sendNotification($notifiable);
+});
