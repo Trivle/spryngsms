@@ -2,7 +2,4 @@
 
 namespace Oscar\Spryngsms\Exceptions;
 
-class CouldNotSendSmsNotification extends \Exception
-{
-    
-}
+class CouldNotSendSmsNotification extends \Exception {}

@@ -9,8 +9,7 @@ class SpryngsmsChannel
 {
     public function __construct(
         private SpryngsmsClient $client
-    ) {
-    }
+    ) {}
 
     /**
      * @throws RequestException|Exceptions\CouldNotSendSmsNotification

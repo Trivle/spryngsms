@@ -10,7 +10,7 @@ class SpryngsmsServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->publishes(
-                [__DIR__ . '/../config/spryngsms.php' => config_path('spryngsms.php')],
+                [__DIR__.'/../config/spryngsms.php' => config_path('spryngsms.php')],
                 'spryngsms-config'
             );
         }
@@ -18,6 +18,6 @@ class SpryngsmsServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/spryngsms.php', 'spryngsms');
+        $this->mergeConfigFrom(__DIR__.'/../config/spryngsms.php', 'spryngsms');
     }
 }

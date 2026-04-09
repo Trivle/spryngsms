@@ -1,4 +1,5 @@
 <?php
+
 return [
     /*
     |----------------------------------------------------------------------
@@ -50,5 +51,5 @@ return [
     | A client reference.
     |
     */
-    'reference' => env('SPRYNG_SMS_REFERENCE')
+    'reference' => env('SPRYNG_SMS_REFERENCE'),
 ];
